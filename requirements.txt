@@ -1,3 +1,4 @@
+# Core agent dependencies
 langgraph
 langchain
 langchain-community
@@ -10,3 +11,8 @@ sentence-transformers
 groq
 python-dotenv
 streamlit
+
+# WhatsApp webhook server
+fastapi
+uvicorn[standard]
+httpx
