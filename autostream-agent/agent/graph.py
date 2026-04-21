@@ -28,11 +28,14 @@ def _route_by_intent(state: AgentState) -> str:
 def _route_lead_collection(state: AgentState) -> str:
     """
     After lead_collection_node runs:
-    - If still awaiting a field → loop back to lead_collection.
-    - If all fields collected   → go to lead_capture.
+    - If still awaiting a field → end the turn and wait for the user's reply.
+      (Returning END stops the graph so the next graph.invoke() call brings
+      the user's actual answer, preventing the previous turn's message from
+      being mis-stored as a lead field.)
+    - If all fields are collected (awaiting is None) → go to lead_capture.
     """
     if state.get("awaiting") is not None:
-        return "lead_collection"
+        return END   # Stop here; resume on next user message
     return "lead_capture"
 
 
@@ -68,12 +71,13 @@ def build_graph() -> StateGraph:
     graph.add_edge("greeting", END)
     graph.add_edge("rag_responder", END)
 
-    # Lead collection loop
+    # Lead collection: end the turn while waiting for a field,
+    # or proceed to capture once all fields are collected.
     graph.add_conditional_edges(
         "lead_collection",
         _route_lead_collection,
         {
-            "lead_collection": "lead_collection",
+            END: END,
             "lead_capture": "lead_capture",
         },
     )
@@ -85,4 +89,3 @@ def build_graph() -> StateGraph:
 
 # Compiled graph — imported by main.py
 compiled_graph = build_graph().compile()
-
