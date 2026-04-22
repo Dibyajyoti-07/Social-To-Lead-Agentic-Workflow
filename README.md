@@ -82,10 +82,10 @@ flowchart TD
     A([User Message]) --> B[Router Node]
 
     B -->|awaiting is set\nmid-collection| C[Lead Collection Node]
-    B -->|awaiting is None| D[Intent Classifier\nGemini 2.0 Flash]
+    B -->|awaiting is None| D[Intent Classifier\nGemini 2.5 Flash]
 
-    D -->|greeting| E[Greeting Node\nGemini 2.0 Flash]
-    D -->|product_inquiry| F[RAG Responder Node\nGemini 2.0 Flash]
+    D -->|greeting| E[Greeting Node\nGemini 2.5 Flash]
+    D -->|product_inquiry| F[RAG Responder Node\nGemini 2.5 Flash]
     D -->|high_intent| C
 
     F --> G[(ChromaDB\nVector Store)]
@@ -107,7 +107,7 @@ flowchart LR
     B -->|all-MiniLM-L6-v2\nembeddings| C[(ChromaDB\nchroma_db/)]
     D[User Query] -->|embed query| E[Similarity Search\ntop-k=2]
     C --> E
-    E -->|retrieved context| F[Gemini 2.0 Flash\nSystem Prompt]
+    E -->|retrieved context| F[Gemini 2.5 Flash\nSystem Prompt]
     F --> G[Grounded Answer]
 ```
 
@@ -119,7 +119,7 @@ sequenceDiagram
     participant M as Meta Cloud API
     participant W as webhook.py (FastAPI)
     participant A as AutoStream Agent
-    participant G as Gemini 2.0 Flash
+    participant G as Gemini 2.5 Flash
 
     U->>M: Sends message
     M->>W: POST /webhook
