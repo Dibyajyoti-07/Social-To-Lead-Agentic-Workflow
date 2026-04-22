@@ -91,12 +91,12 @@ flowchart TD
     F --> G[(ChromaDB\nVector Store)]
     G -->|top-2 chunks| F
 
-    C -->|still missing\nname / email / platform| C
-    C -->|all fields collected| H[Lead Capture Node\nmock_lead_capture]
+    C -->|still missing\nname / email / platform| H[Lead Capture Node\nmock_lead_capture]
+    H -->|all fields collected| I[Lead Capture Node\nmock_lead_capture]
 
     E --> Z([END])
     F --> Z
-    H --> Z
+    I --> Z
 ```
 
 ### RAG Pipeline
