@@ -13,7 +13,7 @@ load_dotenv()
 # Shared LLM instance (Google Gemini 1.5 Flash)
 # ---------------------------------------------------------------------------
 _llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.5-flash-lite",
     google_api_key=os.environ.get("GOOGLE_API_KEY"),
     temperature=0.3,
 )
