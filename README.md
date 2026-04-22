@@ -17,7 +17,7 @@ All frameworks, models, and tools are **free and open-source**.
 | Component | Choice |
 |---|---|
 | Agent Framework | LangGraph (stateful multi-turn) |
-| LLM | Google Gemini 2.0 Flash (`gemini-2.0-flash`) |
+| LLM | Google Gemini 2.5 Flash (`gemini-2.0-flash`) |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` (local) |
 | Vector Store | ChromaDB (local, persistent) |
 | RAG | LangChain + ChromaDB + sentence-transformers |
