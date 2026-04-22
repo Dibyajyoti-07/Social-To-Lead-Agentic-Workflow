@@ -193,13 +193,13 @@ Agent: The Pro plan is $79/month and includes unlimited videos, 4K resolution, a
 You:   I want to sign up for the Pro plan for my YouTube channel.
 Agent: I'd love to get you started! 🎬 First, what's your name?
 
-You:   Dibyajyoti
-Agent: Thanks, Dibyajyoti! What's your email address?
+You:   John Doe
+Agent: Thanks, John Doe! What's your email address?
 
-You:   dibyajyoti@gmail.com
+You:   johndoe@gmail.com
 Agent: Almost there! Which platform do you mainly create content on?
 
 You:   YouTube
-Agent: 🎉 Thanks, Dibyajyoti! You're all set. Our team will reach out to
-       dibyajyoti@gmail.com very soon. We can't wait to see your YouTube content level up! 🚀
+Agent: 🎉 Thanks, John Doe! You're all set. Our team will reach out to
+       johndoe@gmail.com very soon. We can't wait to see your YouTube content level up! 🚀
 ```

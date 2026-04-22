@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -9,12 +10,10 @@ from agent.tools import mock_lead_capture
 
 load_dotenv()
 
-# ---------------------------------------------------------------------------
-# Shared LLM instance (Google Gemini 1.5 Flash)
-# ---------------------------------------------------------------------------
-_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
-    google_api_key=os.environ.get("GOOGLE_API_KEY"),
+
+_llm = ChatGroq(
+    model_name="llama-3.3-70b-versatile",
+    groq_api_key=os.environ.get("GROQ_API_KEY"),
     temperature=0.3,
 )
 
