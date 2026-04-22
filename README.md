@@ -73,17 +73,80 @@ Then register the webhook URL in your Meta Developer dashboard. See `WHATSAPP_DE
 
 ---
 
-## Architecture (~200 words)
+## Architecture
 
-**LangGraph** was chosen because it provides explicit, typed state management via a `TypedDict` state dict. Every turn, the same state object flows into `graph.invoke()`, making multi-turn memory trivial — fields like `lead_name` and `awaiting` persist naturally without a database.
+### LangGraph Agent Flow
 
-The graph uses a **router node** as its entry point. On every incoming message it first checks whether the user is mid-lead-collection (`awaiting` is set). If so, it routes directly to `lead_collection_node`, bypassing the intent classifier entirely. This prevents the LLM from misclassifying short answers like a name or email address as greetings or product inquiries — a critical fix for real-world reliability.
+```mermaid
+flowchart TD
+    A([User Message]) --> B[Router Node]
 
-The **RAG pipeline** uses `sentence-transformers/all-MiniLM-L6-v2` to embed the `autostream_kb.md` knowledge base locally. Chunks are stored in **ChromaDB** (persisted to disk under `chroma_db/`). On each product-inquiry turn, the top-2 most relevant chunks are retrieved via cosine similarity and injected into the LLM's system prompt — grounding all pricing and policy answers in verified content, preventing hallucination.
+    B -->|awaiting is set\nmid-collection| C[Lead Collection Node]
+    B -->|awaiting is None| D[Intent Classifier\nGemini 2.0 Flash]
 
-**Intent classification** is a separate lightweight LLM call with a constrained, label-only output prompt. Running it fresh on every non-collection turn means intent shifts mid-conversation (e.g., from inquiry to high-intent) are caught immediately.
+    D -->|greeting| E[Greeting Node\nGemini 2.0 Flash]
+    D -->|product_inquiry| F[RAG Responder Node\nGemini 2.0 Flash]
+    D -->|high_intent| C
 
-**Tool execution** (`mock_lead_capture`) is gated by a conditional edge — the `lead_capture` node only fires when *all three* fields (name, email, platform) are non-None. The `lead_collection_node` also validates email format before accepting it.
+    F --> G[(ChromaDB\nVector Store)]
+    G -->|top-2 chunks| F
+
+    C -->|still missing\nname / email / platform| C
+    C -->|all fields collected| H[Lead Capture Node\nmock_lead_capture]
+
+    E --> Z([END])
+    F --> Z
+    H --> Z
+```
+
+### RAG Pipeline
+
+```mermaid
+flowchart LR
+    A[autostream_kb.md] -->|TextLoader| B[Document Chunks\nsize=300, overlap=50]
+    B -->|all-MiniLM-L6-v2\nembeddings| C[(ChromaDB\nchroma_db/)]
+    D[User Query] -->|embed query| E[Similarity Search\ntop-k=2]
+    C --> E
+    E -->|retrieved context| F[Gemini 2.0 Flash\nSystem Prompt]
+    F --> G[Grounded Answer]
+```
+
+### WhatsApp Webhook Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User (WhatsApp)
+    participant M as Meta Cloud API
+    participant W as webhook.py (FastAPI)
+    participant A as AutoStream Agent
+    participant G as Gemini 2.0 Flash
+
+    U->>M: Sends message
+    M->>W: POST /webhook
+    W->>W: Load session state\n(by phone number)
+    W->>A: compiled_graph.invoke(state)
+    A->>G: LLM call(s)
+    G-->>A: Response
+    A-->>W: Updated state + reply
+    W->>W: Save state to sessions
+    W->>W: Save phone to contacts.json
+    W->>M: POST /messages (reply)
+    M->>U: Delivers reply
+```
+
+### State Management
+
+```mermaid
+flowchart LR
+    S["AgentState (TypedDict)"]
+    S --> M[messages\nfull conversation history]
+    S --> I[intent\ngreeting / product_inquiry / high_intent]
+    S --> N[lead_name]
+    S --> E[lead_email]
+    S --> P[lead_platform]
+    S --> LC[lead_captured\nbool]
+    S --> AW[awaiting\nname / email / platform / None]
+```
 
 ---
 
@@ -94,27 +157,6 @@ See **`WHATSAPP_DEPLOYMENT.md`** for the complete guide including:
 - Getting your API token and Phone Number ID
 - Registering the webhook with ngrok
 - Production checklist (Redis sessions, permanent token, signature verification)
-
-### How it works
-
-```
-User (WhatsApp)
-      │  sends message
-      ▼
-Meta Cloud API
-      │  POST /webhook
-      ▼
-webhook.py  (FastAPI)
-      │  compiled_graph.invoke(state)
-      ▼
-AutoStream Agent  (LangGraph)
-      │  produces reply
-      ▼
-webhook.py
-      │  POST graph.facebook.com/…/messages
-      ▼
-User (WhatsApp)
-```
 
 ### Contact saving
 
