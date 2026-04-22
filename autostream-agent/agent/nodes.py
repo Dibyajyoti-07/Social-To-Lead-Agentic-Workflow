@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from agent.state import AgentState
@@ -10,11 +10,11 @@ from agent.tools import mock_lead_capture
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Shared LLM instance (Groq — free tier, Llama 3.1 8B)
+# Shared LLM instance (Google Gemini 1.5 Flash)
 # ---------------------------------------------------------------------------
-_llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    api_key=os.environ.get("GROQ_API_KEY"),
+_llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    google_api_key=os.environ.get("GOOGLE_API_KEY"),
     temperature=0.3,
 )
 
@@ -114,13 +114,18 @@ def lead_collection_node(state: AgentState) -> dict:
     if awaiting == "name":
         updates["lead_name"] = user_msg
     elif awaiting == "email":
+        # Basic email validation before accepting
+        if "@" not in user_msg or "." not in user_msg:
+            question = "That doesn't look like a valid email address. Could you double-check it? 📧"
+            updated_messages = state["messages"] + [{"role": "assistant", "content": question}]
+            return {"awaiting": "email", "messages": updated_messages}
         updates["lead_email"] = user_msg
     elif awaiting == "platform":
         updates["lead_platform"] = user_msg
 
     # Compute effective values after applying updates
-    name = updates.get("lead_name", state.get("lead_name"))
-    email = updates.get("lead_email", state.get("lead_email"))
+    name     = updates.get("lead_name",     state.get("lead_name"))
+    email    = updates.get("lead_email",    state.get("lead_email"))
     platform = updates.get("lead_platform", state.get("lead_platform"))
 
     # --- Determine the next missing field ---
@@ -155,9 +160,9 @@ def lead_collection_node(state: AgentState) -> dict:
     # All fields are ready — no message appended; lead_capture_node will respond
     return {
         **updates,
-        "awaiting": None,
-        "lead_name": name,
-        "lead_email": email,
+        "awaiting":      None,
+        "lead_name":     name,
+        "lead_email":    email,
         "lead_platform": platform,
     }
 
@@ -170,8 +175,8 @@ def lead_capture_node(state: AgentState) -> dict:
     Call mock_lead_capture with all three collected fields and confirm to user.
     Only reached when name, email, and platform are all non-empty.
     """
-    name = state["lead_name"]
-    email = state["lead_email"]
+    name     = state["lead_name"]
+    email    = state["lead_email"]
     platform = state["lead_platform"]
 
     # Fire the mock tool
@@ -185,7 +190,7 @@ def lead_capture_node(state: AgentState) -> dict:
 
     updated_messages = state["messages"] + [{"role": "assistant", "content": confirmation}]
     return {
-        "messages": updated_messages,
+        "messages":      updated_messages,
         "lead_captured": True,
     }
 
@@ -214,4 +219,3 @@ def greeting_node(state: AgentState) -> dict:
     answer = response.content.strip()
     updated_messages = state["messages"] + [{"role": "assistant", "content": answer}]
     return {"messages": updated_messages}
-
