@@ -11,8 +11,40 @@ from agent.nodes import (
 
 
 # ---------------------------------------------------------------------------
+# Router node (passthrough — modifies no state)
+# ---------------------------------------------------------------------------
+
+def _entry_router_node(state: AgentState) -> dict:
+    """
+    Passthrough node. Does not modify state.
+    Exists solely so we can attach a conditional edge at the very start
+    of the graph, before intent classification runs.
+    """
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Routing functions (used as conditional edges)
 # ---------------------------------------------------------------------------
+
+def _entry_router(state: AgentState) -> str:
+    """
+    THE KEY FIX — called immediately after _entry_router_node.
+
+    If the user is mid-lead-collection (awaiting is set to 'name', 'email',
+    or 'platform'), skip intent classification entirely and go straight to
+    lead_collection_node.
+
+    Why this matters:
+    Without this, every user message — including answers like "Dibyajyoti"
+    or "dibyajyoti@gmail.com" — is passed through the intent classifier.
+    The LLM misreads these as greetings or product inquiries and routes
+    them to the wrong node, completely breaking the collection flow.
+    """
+    if state.get("awaiting") is not None:
+        return "lead_collection"
+    return "intent_classifier"
+
 
 def _route_by_intent(state: AgentState) -> str:
     """Route after intent classification."""
@@ -28,14 +60,11 @@ def _route_by_intent(state: AgentState) -> str:
 def _route_lead_collection(state: AgentState) -> str:
     """
     After lead_collection_node runs:
-    - If still awaiting a field → end the turn and wait for the user's reply.
-      (Returning END stops the graph so the next graph.invoke() call brings
-      the user's actual answer, preventing the previous turn's message from
-      being mis-stored as a lead field.)
-    - If all fields are collected (awaiting is None) → go to lead_capture.
+    - Still awaiting a field → end the turn, wait for the user's next message.
+    - All fields collected  → proceed to lead_capture.
     """
     if state.get("awaiting") is not None:
-        return END   # Stop here; resume on next user message
+        return END
     return "lead_capture"
 
 
@@ -46,38 +75,48 @@ def _route_lead_collection(state: AgentState) -> str:
 def build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
-    # Register nodes
+    # --- Register nodes ---
+    graph.add_node("router",            _entry_router_node)
     graph.add_node("intent_classifier", intent_classifier_node)
-    graph.add_node("rag_responder", rag_responder_node)
-    graph.add_node("lead_collection", lead_collection_node)
-    graph.add_node("lead_capture", lead_capture_node)
-    graph.add_node("greeting", greeting_node)
+    graph.add_node("rag_responder",     rag_responder_node)
+    graph.add_node("lead_collection",   lead_collection_node)
+    graph.add_node("lead_capture",      lead_capture_node)
+    graph.add_node("greeting",          greeting_node)
 
-    # Entry point
-    graph.set_entry_point("intent_classifier")
+    # --- Entry point is now the router, not intent_classifier ---
+    graph.set_entry_point("router")
 
-    # Conditional routing after intent classification
+    # Router: bypass intent classifier when mid-collection
+    graph.add_conditional_edges(
+        "router",
+        _entry_router,
+        {
+            "intent_classifier": "intent_classifier",
+            "lead_collection":   "lead_collection",
+        },
+    )
+
+    # After intent classification, route by detected intent
     graph.add_conditional_edges(
         "intent_classifier",
         _route_by_intent,
         {
-            "greeting": "greeting",
-            "rag_responder": "rag_responder",
+            "greeting":        "greeting",
+            "rag_responder":   "rag_responder",
             "lead_collection": "lead_collection",
         },
     )
 
     # Terminal nodes → END
-    graph.add_edge("greeting", END)
+    graph.add_edge("greeting",      END)
     graph.add_edge("rag_responder", END)
 
-    # Lead collection: end the turn while waiting for a field,
-    # or proceed to capture once all fields are collected.
+    # Lead collection loop / capture gate
     graph.add_conditional_edges(
         "lead_collection",
         _route_lead_collection,
         {
-            END: END,
+            END:            END,
             "lead_capture": "lead_capture",
         },
     )
@@ -87,5 +126,5 @@ def build_graph() -> StateGraph:
     return graph
 
 
-# Compiled graph — imported by main.py
+# Compiled graph — imported by main.py and webhook.py
 compiled_graph = build_graph().compile()
